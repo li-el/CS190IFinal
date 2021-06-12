@@ -15,18 +15,16 @@ class Circuitsv():
         self.vin = Net('VI')
         self.vout = Net('VO')
         self.ground = Net('GND')
-        self.sanity = Net('Sanity')
         self.pow = []
-        self.circuit += self.vin, self.vout, self.ground, self.sanity
+        self.circuit += self.vin, self.vout, self.ground
     def reinit(self):
         self.circuit.reset()
         self.circuit = Circuit()
         self.vin = Net('VI')
         self.vout = Net('VO')
         self.ground = Net('GND')
-        self.sanity = Net('Sanity')
         self.pow = []
-        self.circuit += self.vin, self.vout, self.ground, self.sanity
+        self.circuit += self.vin, self.vout, self.ground
 
 class ToyInterpreter(PostOrderInterpreter):
     def __init__(self, circuit):
