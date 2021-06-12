@@ -10,6 +10,7 @@ from ..logger import get_logger
 logger = get_logger('tyrell.desugar')
 
 
+
 class ParseTreeProcessingError(RuntimeError):
     pass
 
@@ -21,11 +22,14 @@ class TypeCollector(Visitor_Recursive):
         self._spec = TypeSpec()
 
     def enum_decl(self, tree):
+        logger.info('enum decl')
+        logger.info(tree)
         name = str(tree.children[0])
         domain = [literal_eval(str(x)) for x in tree.children[1].children]
         self._spec.define_type(EnumType(name, domain))
 
     def enum_set_decl(self, tree):
+        logger.info('We there')
         name = str(tree.children[0])
         max_len = int(tree.children[1])
         domain = [literal_eval(str(x)) for x in tree.children[2].children]
@@ -48,12 +52,16 @@ class TypeCollector(Visitor_Recursive):
         return ret
 
     def value_decl(self, tree):
+        logger.info("value decl")
+        logger.info(tree)
         name = tree.children[0]
         properties = self._process_properties(tree.children[1].children)
+        logger.info(properties)
         try:
             self._spec.define_type(ValueType(name, properties))
         except ValueError as e:
             # Handle duplicated property name
+            logger.debug(name)
             raise ParseTreeProcessingError('{}'.format(e))
 
     def collect(self) -> TypeSpec:
@@ -70,11 +78,16 @@ class ProgramCollector(Visitor_Recursive):
         self._type_spec = type_spec
 
     def program_decl(self, tree):
+        logger.info('program_decl')
+        logger.info(tree)
         self._name = str(tree.children[0])
         input_names = [str(x) for x in tree.children[1].children]
         output_name = str(tree.children[2])
+        logger.info(input_names)
+        logger.info(output_name)
         self._input_tys = [
             self._type_spec.get_type_or_raise(x) for x in input_names]
+
         self._output_ty = self._type_spec.get_type_or_raise(output_name)
 
     def collect(self) -> ProgramSpec:
@@ -281,6 +294,8 @@ def desugar(parse_tree):
         type_collector = TypeCollector()
         type_collector.visit(parse_tree)
         type_spec = type_collector.collect()
+        logger.info("______________")
+        logger.info(type_spec)
 
         logger.debug('Processing input/output definitions...')
         prog_collector = ProgramCollector(type_spec)

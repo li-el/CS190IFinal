@@ -26,8 +26,12 @@ from .assert_violation_handler import AssertionViolationHandler
 from .eval_expr import eval_expr
 from .constraint_encoder import ConstraintEncoder
 from .result import ok, bad
+from skidl import *
+from skidl.pyspice import *
+import math
 
 logger = get_logger('tyrell.synthesizer.constraint')
+logger.info('Whatup')
 ImplyMap = Mapping[Tuple[Production, Expr], List[Production]]
 MutableImplyMap = MutableMapping[Tuple[Production, Expr], List[Production]]
 
@@ -183,18 +187,110 @@ class BlameFinder:
                 frozenset([(n, n.production) for n in base_nodes])
             )
 
-class HighOrderConstraintDecider(ExampleDecider):
+class SimpleSpiceDecider(ExampleDecider):
     _imply_map: ImplyMap
     _assert_handler: AssertionViolationHandler
-    @staticmethod
-    def func(x,y):
-        return x == y
 
+    @staticmethod
+    def multTest(x,y):
+        with x.circuit:
+            vs = SINEV(amplitude=0.01 @ u_V, frequency=1 @ u_kHz)
+            rs = R(value=5 @ u_kOhm)
+            vs['n'] += x.ground
+            rs[1, 2] += vs['p'], x.vin
+
+        try:
+            c = x.circuit.generate_netlist()  # Translate the SKiDL code into a PyCircuit Circuit object.
+            sim = c.simulator()  # Create a simulator for the Circuit object.
+            dc_vals = sim.transient(step_time=0.01@u_ms, end_time=5@u_ms)
+            #logger.info("what")
+            #logger.info(dc_vals.nodes)
+            voltage = dc_vals[node(vs['p'])]
+            # Get the voltage applied by the positive terminal of the source.
+            voltageout = dc_vals[node(x.vout)]
+
+        except:
+            pass
+        bv = True
+        try:
+
+            vcheck = voltageout.as_ndarray()
+            vorig = voltage.as_ndarray()
+            if len(vcheck) == len(vorig):
+                ampl = max(vcheck)/max(vorig)
+                logger.debug(ampl)
+                if ampl - y < y*0.01 and ampl - y > -y*0.01:
+                    print(ampl)
+                    pass
+
+                else:
+                    bv = False
+            else:
+                bv = False
+        except:
+            bv = False
+        if bv == False:
+            x.reinit()
+        return bv
+
+    @staticmethod
+    def divTest(x,y):
+        with x.circuit:
+            #logger.debug(x.circuit.nets)
+            vs = V(ref='VS',
+                   dc_value=1 @ u_V)
+            vs['p'] += x.vin
+            #logger.info(vs)
+            x.ground += vs['n']
+        #gnd += vs['n']
+
+        # Simulate the circuit.
+
+        # Get the voltage applied to the resistor and the current coming out of the voltage source.
+        try:
+            c = x.circuit.generate_netlist()  # Translate the SKiDL code into a PyCircuit Circuit object.
+            sim = c.simulator()  # Create a simulator for the Circuit object.
+            dc_vals = sim.dc(
+                VS=slice(0, 1, 0.1))  # Run a DC simulation where the voltage ramps from 0 to 1V by 0.1V increments.
+            #logger.info("what")
+            #logger.info(dc_vals.nodes)
+            voltage = dc_vals[node(vs['p'])]
+            # Get the voltage applied by the positive terminal of the source.
+            voltageout = dc_vals[node(x.vout)]
+
+        except:
+            pass
+        bv = True
+        try:
+            vcheck = voltageout.as_ndarray()
+            vorig = voltage.as_ndarray()
+            if len(vcheck) == len(vorig):
+                for i in range(len(vcheck)):
+                    if not(math.isclose(vorig[i]/y, vcheck[i])):
+                        logger.info("IN Fail")
+                        logger.info(vcheck[i])
+                        logger.info(vorig[i]/y)
+                        bv = False
+                        break
+            else:
+                bv = False
+        except:
+            bv = False
+        if bv == False:
+            x.reinit()
+        return bv
+
+    @staticmethod
+    def testParse(x, y):
+        if y[0] == "mult":
+            return SimpleSpiceDecider.multTest(x, y[1])
+        elif y[0] == "div":
+            return SimpleSpiceDecider.divTest(x,y[1])
     def __init__(self,
                  spec: TyrellSpec,
                  interpreter: Interpreter,
                  examples: List[Example],
-                 equal_output: Callable[[Any, Any], bool] = lambda x, y: HighOrderConstraintDecider.func(x,y)):
+                 equal_output: Callable[[Any, Any], bool] = lambda x, y: SimpleSpiceDecider.testParse(x,y)):
         super().__init__(interpreter, examples, equal_output)
         self._imply_map = self._build_imply_map(spec)
         self._assert_handler = AssertionViolationHandler(spec, interpreter)
@@ -236,19 +332,27 @@ class HighOrderConstraintDecider(ExampleDecider):
 
     def analyze(self, prog):
         '''
-        This version of analyze() tries to analyze the reason why a synthesized program fails, if it does not pass all the tests.
+        This basic version of analyze() merely interpret the AST and see if it conforms to our examples
         '''
-        failed_examples = self.get_failed_examples(prog)
-        if len(failed_examples) == 0:
-            return ok()
+        if self.has_failed_examples(prog):
+            return bad()
         else:
-            blame_finder = BlameFinder(self.interpreter, self._imply_map, prog)
-            blame_finder.process_examples(failed_examples)
-            blames = blame_finder.get_blames()
-            if len(blames) == 0:
-                return bad()
-            else:
-                return bad(why=blames)
+            return ok()
+    # def analyze(self, prog):
+    #     '''
+    #     This version of analyze() tries to analyze the reason why a synthesized program fails, if it does not pass all the tests.
+    #     '''
+    #     failed_examples = self.get_failed_examples(prog)
+    #     if len(failed_examples) == 0:
+    #         return ok()
+    #     else:
+    #         blame_finder = BlameFinder(self.interpreter, self._imply_map, prog)
+    #         blame_finder.process_examples(failed_examples)
+    #         blames = blame_finder.get_blames()
+    #         if len(blames) == 0:
+    #             return bad()
+    #         else:
+    #             return bad(why=blames)
 
     def analyze_interpreter_error(self, error: InterpreterError):
         return self._assert_handler.handle_interpreter_error(error)

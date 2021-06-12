@@ -1,10 +1,11 @@
 from typing import Set, Optional
 from random import Random
 from .enumerator import Enumerator
+from .. import logger as logs
 from .. import dsl as D
 from .. import spec as S
 
-
+logger = logs.get_logger('tyrell')
 class RelaxedRandomEnumerator(Enumerator):
     _rand: Random
     _max_depth: int
@@ -34,6 +35,7 @@ class RelaxedRandomEnumerator(Enumerator):
 
         # First, get all the relevant production rules for current type
         productions = self._builder.get_productions_with_lhs(curr_type)
+        logger.debug(productions)
 
         if force_leaf:
             new_productions = list(

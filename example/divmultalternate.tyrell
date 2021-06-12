@@ -1,0 +1,59 @@
+enum Resist {
+  "1", "25", "500", "1000"
+}
+
+enum OutNet {
+    "out"
+    }
+
+enum GroundNet{
+    "ground"
+    }
+enum Pow{
+    "Pow"
+}
+
+value Circuits {
+    vin: int;
+    vout: int;
+    ground: int;
+}
+value Empty;
+value Resistor;
+value Part;
+value Transistor;
+value Supply;
+value Resistance;
+value Net;
+value GNet;
+value ONet;
+value GONet;
+
+
+
+program Toy(Circuits) -> Circuits;
+func empty: Empty -> Empty;
+
+func get_Resistance: Resistance -> Resist;
+func get_Supply: Supply->Pow;
+func get_outnet: Net -> OutNet;
+
+func get_ground: GONet -> GroundNet;
+
+func startCon: Circuits -> Resistor, GNet;
+
+func toTransist: Part -> Transistor;
+
+
+func Tout: Transistor -> Net, Net, GONet;
+
+func Rout: Resistor -> Net, Resistance;
+
+func Nout: Net -> Resistor;
+func NO: Net -> Resistor;
+func NI: Net -> Resistor;
+
+func Rpow: Resistor -> Supply, Resistance;
+
+func GR: GNet -> Resistor;
+
