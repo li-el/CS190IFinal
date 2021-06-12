@@ -1,0 +1,30 @@
+enum Resist {
+  "1000", "500", "1500"
+}
+
+enum OutNet {
+    "out"
+    }
+
+value Circuits {
+    vin: int;
+    vout: int;
+    ground: int;
+}
+value Empty;
+value Resistor;
+value Resistance;
+value Net;
+value GNet;
+value ONet;
+
+program Toy(Circuits) -> Circuits;
+func empty: Empty -> Empty;
+
+func get_Resistance: Resistance -> Resist;
+func get_outnet: Net -> OutNet;
+
+func startCon: Circuits -> Resistor, GNet;
+func Rout: Resistor -> Net, Resistance;
+func GR: GNet -> Resistor;
+
